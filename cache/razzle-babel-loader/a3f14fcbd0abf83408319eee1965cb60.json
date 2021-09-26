@@ -1,1 +1,0 @@
-{"ast":null,"code":"export * from \"./base.model\";\nexport * from \"./user.model\";","map":{"version":3,"sources":["/Users/carlos/Documents/Projetos/Javascript/bills_api/src/models/index.ts"],"names":[],"mappings":"AAAA,cAAc,cAAd;AACA,cAAc,cAAd","sourcesContent":["export * from \"./base.model\";\nexport * from \"./user.model\";\n"]},"metadata":{},"sourceType":"module"}

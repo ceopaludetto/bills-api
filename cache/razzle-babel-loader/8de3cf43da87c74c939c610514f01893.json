@@ -1,1 +1,0 @@
-{"ast":null,"code":"export * from \"./authentication\";\nexport * from \"./user\";","map":{"version":3,"sources":["/Users/carlos/Documents/Projetos/Javascript/bills_api/src/modules/index.ts"],"names":[],"mappings":"AAAA,cAAc,kBAAd;AACA,cAAc,QAAd","sourcesContent":["export * from \"./authentication\";\nexport * from \"./user\";\n"]},"metadata":{},"sourceType":"module"}
