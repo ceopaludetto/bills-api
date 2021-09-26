@@ -1,0 +1,91 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+input AuthenticationLoginInput {
+  email: String!
+  password: String!
+}
+
+input AuthenticationRegisterInput {
+  email: String!
+  firstName: String!
+  lastName: String!
+  password: String!
+}
+
+type Bill implements Node {
+  createdAt: DateTime!
+  id: ID!
+  isPositive: Boolean!
+  name: String!
+  type: BillType!
+  updatedAt: DateTime!
+  user: User!
+  value: Int!
+}
+
+type BillConnection {
+  edges: [BillEdge!]!
+  pageInfo: PageInfo!
+}
+
+type BillEdge {
+  cursor: String!
+  node: Bill!
+}
+
+input BillInsertInput {
+  name: String!
+  type: BillType!
+  value: Float!
+}
+
+enum BillType {
+  BANK_INVOICE
+  BANK_SLIP
+  INVESTMENT
+  SALARY
+  TAX
+  TRANSFER
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type Mutation {
+  checkToken(token: String!): Boolean!
+  login(input: AuthenticationLoginInput!): User!
+  register(input: AuthenticationRegisterInput!): User!
+  saveBill(input: BillInsertInput!): Bill!
+}
+
+interface Node {
+  id: ID!
+}
+
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String!
+}
+
+type Query {
+  getBalancePerMonth(date: DateTime): Int!
+  getBillsPerMonth(after: String, before: String, first: Int, last: Int): BillConnection!
+  profile: User!
+}
+
+type User implements Node {
+  bills: [Bill!]!
+  createdAt: DateTime!
+  email: String!
+  firstName: String!
+  fullName: String!
+  id: ID!
+  lastName: String!
+  updatedAt: DateTime!
+}
