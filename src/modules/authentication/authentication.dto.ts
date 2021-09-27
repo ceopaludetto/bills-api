@@ -1,7 +1,7 @@
-import { ArgsType, Field, InputType } from "@nestjs/graphql";
-import { IsString, IsNotEmpty, IsEmail, IsJWT } from "class-validator";
+import { Field, InputType } from "@nestjs/graphql";
+import { IsString, IsNotEmpty, IsEmail } from "class-validator";
 
-import { Email, RemoveBearer, Trim } from "@/utils/transforms";
+import { Email, Trim } from "@/utils/transforms";
 
 @InputType()
 export class AuthenticationRegisterInput {
@@ -45,14 +45,4 @@ export class AuthenticationLoginInput {
   @IsNotEmpty()
   @Trim()
   public password!: string;
-}
-
-@ArgsType()
-export class AuthenticationCheckTokenArgs {
-  @Field()
-  @IsString()
-  @IsJWT()
-  @IsNotEmpty()
-  @RemoveBearer()
-  public token!: string;
 }

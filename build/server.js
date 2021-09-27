@@ -589,7 +589,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
-exports.AuthenticationCheckTokenArgs = exports.AuthenticationLoginInput = exports.AuthenticationRegisterInput = void 0;
+exports.AuthenticationLoginInput = exports.AuthenticationRegisterInput = void 0;
 
 const graphql_1 = __webpack_require__(/*! @nestjs/graphql */ "@nestjs/graphql");
 
@@ -635,17 +635,6 @@ __decorate([(0, graphql_1.Field)(), (0, class_validator_1.IsString)(), (0, class
 
 AuthenticationLoginInput = __decorate([(0, graphql_1.InputType)()], AuthenticationLoginInput);
 exports.AuthenticationLoginInput = AuthenticationLoginInput;
-let AuthenticationCheckTokenArgs = class AuthenticationCheckTokenArgs {
-  constructor() {
-    _defineProperty(this, "token", void 0);
-  }
-
-};
-
-__decorate([(0, graphql_1.Field)(), (0, class_validator_1.IsString)(), (0, class_validator_1.IsJWT)(), (0, class_validator_1.IsNotEmpty)(), (0, transforms_1.RemoveBearer)(), __metadata("design:type", String)], AuthenticationCheckTokenArgs.prototype, "token", void 0);
-
-AuthenticationCheckTokenArgs = __decorate([(0, graphql_1.ArgsType)()], AuthenticationCheckTokenArgs);
-exports.AuthenticationCheckTokenArgs = AuthenticationCheckTokenArgs;
 
 /***/ }),
 
@@ -658,6 +647,10 @@ exports.AuthenticationCheckTokenArgs = AuthenticationCheckTokenArgs;
 "use strict";
 
 
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+var _a, _b, _c;
+
 Object.defineProperty(exports, "__esModule", ({
   value: true
 }));
@@ -665,11 +658,33 @@ exports.GqlAuthenticationGuard = void 0;
 
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 
+const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
+
 const graphql_1 = __webpack_require__(/*! @nestjs/graphql */ "@nestjs/graphql");
+
+const jwt_1 = __webpack_require__(/*! @nestjs/jwt */ "@nestjs/jwt");
 
 const passport_1 = __webpack_require__(/*! @nestjs/passport */ "@nestjs/passport");
 
+const authentication_service_1 = __webpack_require__(/*! ./authentication.service */ "./src/modules/authentication/authentication.service.ts");
+
+const extract_1 = __webpack_require__(/*! ./strategies/extract */ "./src/modules/authentication/strategies/extract.ts");
+
 let GqlAuthenticationGuard = class GqlAuthenticationGuard extends (0, passport_1.AuthGuard)("jwt") {
+  constructor(jwtService, configService, authenticationService) {
+    super();
+
+    _defineProperty(this, "jwtService", void 0);
+
+    _defineProperty(this, "configService", void 0);
+
+    _defineProperty(this, "authenticationService", void 0);
+
+    this.jwtService = jwtService;
+    this.configService = configService;
+    this.authenticationService = authenticationService;
+  }
+
   getRequest(context) {
     const {
       req
@@ -677,8 +692,54 @@ let GqlAuthenticationGuard = class GqlAuthenticationGuard extends (0, passport_1
     return req;
   }
 
+  async canActivate(context) {
+    const ctx = graphql_1.GqlExecutionContext.create(context);
+    const {
+      req,
+      res
+    } = ctx.getContext();
+    const token = extract_1.Extract.accessToken(req);
+    if (!token) return super.canActivate(context);
+    let userID;
+
+    try {
+      const payload = this.jwtService.decode(token);
+      userID = payload.id;
+      await this.jwtService.verifyAsync(token);
+    } catch (verifyError) {
+      if (verifyError instanceof Error) {
+        if (verifyError.name === "TokenExpiredError") {
+          const refreshToken = extract_1.Extract.refreshToken(req);
+          if (!refreshToken) return super.canActivate(context);
+          if (!userID) return super.canActivate(context);
+          const user = await this.authenticationService.findUserByTokenID(userID);
+          if (!user) return super.canActivate(context);
+
+          try {
+            await this.jwtService.verifyAsync(refreshToken, {
+              secret: this.configService.get("AUTH_SECRET") + (user === null || user === void 0 ? void 0 : user.password)
+            });
+            const [newAccessToken, newRefreshToken] = await this.authenticationService.genTokens(user);
+            this.authenticationService.setTokensInResponse(res, [newAccessToken, newRefreshToken]);
+            req.headers.accesstoken = newAccessToken;
+            req.headers.refreshtoken = newRefreshToken;
+            return super.canActivate(context);
+          } catch (error) {
+            return super.canActivate(context);
+          }
+        }
+
+        return super.canActivate(context);
+      }
+
+      return super.canActivate(context);
+    }
+
+    return super.canActivate(context);
+  }
+
 };
-GqlAuthenticationGuard = __decorate([(0, common_1.Injectable)()], GqlAuthenticationGuard);
+GqlAuthenticationGuard = __decorate([(0, common_1.Injectable)(), __metadata("design:paramtypes", [typeof (_a = typeof jwt_1.JwtService !== "undefined" && jwt_1.JwtService) === "function" ? _a : Object, typeof (_b = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _b : Object, typeof (_c = typeof authentication_service_1.AuthenticationService !== "undefined" && authentication_service_1.AuthenticationService) === "function" ? _c : Object])], GqlAuthenticationGuard);
 exports.GqlAuthenticationGuard = GqlAuthenticationGuard;
 
 /***/ }),
@@ -718,10 +779,7 @@ AuthenticationModule = __decorate([(0, common_1.Global)(), (0, common_1.Module)(
   imports: [user_1.UserModule, passport_1.PassportModule, jwt_1.JwtModule.registerAsync({
     inject: [config_1.ConfigService],
     useFactory: configService => ({
-      secret: configService.get("AUTH_SECRET"),
-      signOptions: {
-        expiresIn: "1h"
-      }
+      secret: configService.get("AUTH_SECRET")
     })
   })],
   providers: [authentication_resolver_1.AuthenticationResolver, authentication_service_1.AuthenticationService, jwt_strategy_1.JwtStrategy],
@@ -742,7 +800,7 @@ exports.AuthenticationModule = AuthenticationModule;
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-var _a, _b, _c, _d, _e, _f;
+var _a, _b, _c, _d, _e;
 
 Object.defineProperty(exports, "__esModule", ({
   value: true
@@ -791,12 +849,6 @@ let AuthenticationResolver = class AuthenticationResolver {
     return this.authenticationService.register(data, res);
   }
 
-  async checkToken({
-    token
-  }) {
-    return this.authenticationService.checkToken(token);
-  }
-
 };
 
 __decorate([(0, common_1.UseGuards)(authentication_guard_1.GqlAuthenticationGuard), (0, graphql_1.Query)(() => models_1.User), __param(0, (0, authentication_decorator_1.CurrentUser)()), __metadata("design:type", Function), __metadata("design:paramtypes", [typeof (_a = typeof models_1.User !== "undefined" && models_1.User) === "function" ? _a : Object]), __metadata("design:returntype", Promise)], AuthenticationResolver.prototype, "profile", null);
@@ -805,9 +857,7 @@ __decorate([(0, graphql_1.Mutation)(() => models_1.User), __param(0, (0, graphql
 
 __decorate([(0, graphql_1.Mutation)(() => models_1.User), __param(0, (0, graphql_1.Args)("input")), __param(1, (0, graphql_1.Context)()), __metadata("design:type", Function), __metadata("design:paramtypes", [typeof (_c = typeof authentication_dto_1.AuthenticationRegisterInput !== "undefined" && authentication_dto_1.AuthenticationRegisterInput) === "function" ? _c : Object, Object]), __metadata("design:returntype", Promise)], AuthenticationResolver.prototype, "register", null);
 
-__decorate([(0, graphql_1.Mutation)(() => Boolean), __param(0, (0, graphql_1.Args)()), __metadata("design:type", Function), __metadata("design:paramtypes", [typeof (_d = typeof authentication_dto_1.AuthenticationCheckTokenArgs !== "undefined" && authentication_dto_1.AuthenticationCheckTokenArgs) === "function" ? _d : Object]), __metadata("design:returntype", Promise)], AuthenticationResolver.prototype, "checkToken", null);
-
-AuthenticationResolver = __decorate([(0, graphql_1.Resolver)(() => models_1.User), __metadata("design:paramtypes", [typeof (_e = typeof authentication_service_1.AuthenticationService !== "undefined" && authentication_service_1.AuthenticationService) === "function" ? _e : Object, typeof (_f = typeof user_1.UserService !== "undefined" && user_1.UserService) === "function" ? _f : Object])], AuthenticationResolver);
+AuthenticationResolver = __decorate([(0, graphql_1.Resolver)(() => models_1.User), __metadata("design:paramtypes", [typeof (_d = typeof authentication_service_1.AuthenticationService !== "undefined" && authentication_service_1.AuthenticationService) === "function" ? _d : Object, typeof (_e = typeof user_1.UserService !== "undefined" && user_1.UserService) === "function" ? _e : Object])], AuthenticationResolver);
 exports.AuthenticationResolver = AuthenticationResolver;
 
 /***/ }),
@@ -823,7 +873,7 @@ exports.AuthenticationResolver = AuthenticationResolver;
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-var _a, _b;
+var _a, _b, _c;
 
 Object.defineProperty(exports, "__esModule", ({
   value: true
@@ -832,31 +882,47 @@ exports.AuthenticationService = void 0;
 
 const common_1 = __webpack_require__(/*! @nestjs/common */ "@nestjs/common");
 
+const config_1 = __webpack_require__(/*! @nestjs/config */ "@nestjs/config");
+
 const jwt_1 = __webpack_require__(/*! @nestjs/jwt */ "@nestjs/jwt");
 
 const user_1 = __webpack_require__(/*! @/modules/user */ "./src/modules/user/index.ts");
 
 let AuthenticationService = class AuthenticationService {
-  constructor(userService, jwtService) {
+  constructor(userService, jwtService, configService) {
     _defineProperty(this, "userService", void 0);
 
     _defineProperty(this, "jwtService", void 0);
 
+    _defineProperty(this, "configService", void 0);
+
     this.userService = userService;
     this.jwtService = jwtService;
+    this.configService = configService;
   }
 
-  async genToken(user) {
-    return this.jwtService.signAsync({
-      id: user.id,
-      email: user.email
+  async genTokens(user) {
+    const secret = this.configService.get("AUTH_SECRET");
+    const accessExpiration = this.configService.get("AUTH_ACCESS_TOKEN_EXPIRES");
+    const refreshExpiration = this.configService.get("AUTH_REFRESH_TOKEN_EXPIRES");
+    const accessToken = await this.jwtService.signAsync({
+      id: user.id
+    }, {
+      secret,
+      expiresIn: accessExpiration
     });
+    const refreshToken = await this.jwtService.signAsync({
+      id: user.id
+    }, {
+      secret: secret + user.password,
+      expiresIn: refreshExpiration
+    });
+    return [accessToken, refreshToken];
   }
 
   async validatePayload(payload) {
     const user = await this.userService.findByID(payload.id);
     if (!user) throw new common_1.NotFoundException("user-not-found");
-    if (user.email !== payload.email) throw new common_1.UnprocessableEntityException("email-mismatch");
     return user;
   }
 
@@ -867,29 +933,28 @@ let AuthenticationService = class AuthenticationService {
     const user = await this.userService.findByEmail(email);
     if (!user) throw new common_1.NotFoundException("user-not-found");
     if (!(await user.comparePassword(password))) throw new common_1.BadRequestException("incorrect-password");
-    const token = await this.genToken(user);
-    res.header("Authorization", token);
+    this.setTokensInResponse(res, await this.genTokens(user));
     return user;
   }
 
   async register(data, res) {
     const user = await this.userService.create(data);
-    const token = await this.genToken(user);
-    res.header("Authorization", token);
+    this.setTokensInResponse(res, await this.genTokens(user));
     return user;
   }
 
-  async checkToken(token) {
-    try {
-      await this.jwtService.verifyAsync(token);
-      return true;
-    } catch (error) {
-      return false;
-    }
+  async findUserByTokenID(id) {
+    const user = await this.userService.findByID(id);
+    return user;
+  }
+
+  setTokensInResponse(res, [accessToken, refreshToken]) {
+    res.header("Authorization", accessToken);
+    res.header("RefreshToken", refreshToken);
   }
 
 };
-AuthenticationService = __decorate([(0, common_1.Injectable)(), __metadata("design:paramtypes", [typeof (_a = typeof user_1.UserService !== "undefined" && user_1.UserService) === "function" ? _a : Object, typeof (_b = typeof jwt_1.JwtService !== "undefined" && jwt_1.JwtService) === "function" ? _b : Object])], AuthenticationService);
+AuthenticationService = __decorate([(0, common_1.Injectable)(), __metadata("design:paramtypes", [typeof (_a = typeof user_1.UserService !== "undefined" && user_1.UserService) === "function" ? _a : Object, typeof (_b = typeof jwt_1.JwtService !== "undefined" && jwt_1.JwtService) === "function" ? _b : Object, typeof (_c = typeof config_1.ConfigService !== "undefined" && config_1.ConfigService) === "function" ? _c : Object])], AuthenticationService);
 exports.AuthenticationService = AuthenticationService;
 
 /***/ }),
@@ -921,6 +986,36 @@ __exportStar(__webpack_require__(/*! ./authentication.decorator */ "./src/module
 
 /***/ }),
 
+/***/ "./src/modules/authentication/strategies/extract.ts":
+/*!**********************************************************!*\
+  !*** ./src/modules/authentication/strategies/extract.ts ***!
+  \**********************************************************/
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.Extract = void 0;
+
+const passport_jwt_1 = __webpack_require__(/*! passport-jwt */ "passport-jwt");
+
+exports.Extract = {
+  accessToken: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
+  refreshToken: request => {
+    const header = request.header("RefreshToken");
+    if (!header) return undefined;
+    if (!/Bearer/.test(header)) return undefined;
+    const [, token] = header.split(" ");
+    if (!token) return undefined;
+    return token;
+  }
+};
+
+/***/ }),
+
 /***/ "./src/modules/authentication/strategies/jwt.strategy.ts":
 /*!***************************************************************!*\
   !*** ./src/modules/authentication/strategies/jwt.strategy.ts ***!
@@ -949,10 +1044,12 @@ const passport_jwt_1 = __webpack_require__(/*! passport-jwt */ "passport-jwt");
 
 const authentication_service_1 = __webpack_require__(/*! ../authentication.service */ "./src/modules/authentication/authentication.service.ts");
 
+const extract_1 = __webpack_require__(/*! ./extract */ "./src/modules/authentication/strategies/extract.ts");
+
 let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy) {
   constructor(configService, authenticationService) {
     super({
-      jwtFromRequest: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: extract_1.Extract.accessToken,
       ignoreExpiration: false,
       secretOrKey: configService.get("AUTH_SECRET")
     });
@@ -1490,7 +1587,9 @@ exports.envSchema = Joi.object({
   DATABASE_USER: Joi.string().required(),
   DATABASE_PASS: Joi.string().required(),
   GRAPHQL_FILE: Joi.string().default("./src/schema.graphql"),
-  AUTH_SECRET: Joi.string().required()
+  AUTH_SECRET: Joi.string().required(),
+  AUTH_ACCESS_TOKEN_EXPIRES: Joi.string().required(),
+  AUTH_REFRESH_TOKEN_EXPIRES: Joi.string().required()
 });
 
 /***/ }),
@@ -2261,7 +2360,7 @@ module.exports = require("webpack/hot/log-apply-result");;
 /******/ 	
 /******/ 	/* webpack/runtime/getFullHash */
 /******/ 	(() => {
-/******/ 		__webpack_require__.h = () => ("6356362ccf4fb2607762")
+/******/ 		__webpack_require__.h = () => ("97935328fa39b7840904")
 /******/ 	})();
 /******/ 	
 /******/ 	/* webpack/runtime/hasOwnProperty shorthand */

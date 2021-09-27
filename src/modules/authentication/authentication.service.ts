@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, UnprocessableEntityException } from "@nestjs/common";
+import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import type { Response } from "express";
 
@@ -10,16 +11,38 @@ import type { AuthenticationRegisterInput, AuthenticationLoginInput } from "./au
 
 @Injectable()
 export class AuthenticationService {
-  public constructor(private readonly userService: UserService, private readonly jwtService: JwtService) {}
+  public constructor(
+    private readonly userService: UserService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  private async genToken(user: User) {
-    return this.jwtService.signAsync({ id: user.id, email: user.email });
+  public async genTokens(user: User) {
+    const secret = this.configService.get("AUTH_SECRET");
+    const accessExpiration = this.configService.get("AUTH_ACCESS_TOKEN_EXPIRES");
+    const refreshExpiration = this.configService.get("AUTH_REFRESH_TOKEN_EXPIRES");
+
+    const accessToken = await this.jwtService.signAsync(
+      { id: user.id },
+      {
+        secret,
+        expiresIn: accessExpiration,
+      },
+    );
+    const refreshToken = await this.jwtService.signAsync(
+      { id: user.id },
+      {
+        secret: secret + user.password,
+        expiresIn: refreshExpiration,
+      },
+    );
+
+    return [accessToken, refreshToken] as const;
   }
 
   public async validatePayload(payload: TokenPayload) {
     const user = await this.userService.findByID(payload.id);
     if (!user) throw new NotFoundException("user-not-found");
-    if (user.email !== payload.email) throw new UnprocessableEntityException("email-mismatch");
 
     return user;
   }
@@ -30,28 +53,26 @@ export class AuthenticationService {
     if (!user) throw new NotFoundException("user-not-found");
     if (!(await user.comparePassword(password))) throw new BadRequestException("incorrect-password");
 
-    const token = await this.genToken(user);
-
-    res.header("Authorization", token);
+    this.setTokensInResponse(res, await this.genTokens(user));
 
     return user;
   }
 
   public async register(data: AuthenticationRegisterInput, res: Response) {
     const user = await this.userService.create(data);
-    const token = await this.genToken(user);
-
-    res.header("Authorization", token);
+    this.setTokensInResponse(res, await this.genTokens(user));
 
     return user;
   }
 
-  public async checkToken(token: string) {
-    try {
-      await this.jwtService.verifyAsync(token);
-      return true;
-    } catch (error) {
-      return false;
-    }
+  public async findUserByTokenID(id: string) {
+    const user = await this.userService.findByID(id);
+
+    return user;
+  }
+
+  public setTokensInResponse(res: Response, [accessToken, refreshToken]: readonly [string, string]) {
+    res.header("Authorization", accessToken);
+    res.header("RefreshToken", refreshToken);
   }
 }

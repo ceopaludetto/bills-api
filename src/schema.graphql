@@ -56,7 +56,6 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 scalar DateTime
 
 type Mutation {
-  checkToken(token: String!): Boolean!
   login(input: AuthenticationLoginInput!): User!
   register(input: AuthenticationRegisterInput!): User!
   saveBill(input: BillInsertInput!): Bill!

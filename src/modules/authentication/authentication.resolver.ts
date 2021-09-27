@@ -6,11 +6,7 @@ import { UserService } from "@/modules/user";
 import type { GraphQLContext } from "@/utils/types";
 
 import { CurrentUser } from "./authentication.decorator";
-import {
-  AuthenticationRegisterInput,
-  AuthenticationLoginInput,
-  AuthenticationCheckTokenArgs,
-} from "./authentication.dto";
+import { AuthenticationRegisterInput, AuthenticationLoginInput } from "./authentication.dto";
 import { GqlAuthenticationGuard } from "./authentication.guard";
 import { AuthenticationService } from "./authentication.service";
 
@@ -35,10 +31,5 @@ export class AuthenticationResolver {
   @Mutation(() => User)
   public async register(@Args("input") data: AuthenticationRegisterInput, @Context() { res }: GraphQLContext) {
     return this.authenticationService.register(data, res);
-  }
-
-  @Mutation(() => Boolean)
-  public async checkToken(@Args() { token }: AuthenticationCheckTokenArgs) {
-    return this.authenticationService.checkToken(token);
   }
 }

@@ -9,4 +9,6 @@ export const envSchema = Joi.object({
   DATABASE_PASS: Joi.string().required(),
   GRAPHQL_FILE: Joi.string().default("./src/schema.graphql"),
   AUTH_SECRET: Joi.string().required(),
+  AUTH_ACCESS_TOKEN_EXPIRES: Joi.string().required(),
+  AUTH_REFRESH_TOKEN_EXPIRES: Joi.string().required(),
 });
