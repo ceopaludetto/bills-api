@@ -89,6 +89,7 @@ dist
 
 # Razzle files
 cache/
+build
 
 # Gatsby files
 .cache/
