@@ -42,4 +42,12 @@ module.exports = {
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/explicit-member-accessibility": ["error"],
   },
+  overrides: [
+    {
+      files: ["src/models/*"],
+      rules: {
+        "import/no-cycle": "off",
+      },
+    },
+  ],
 };
